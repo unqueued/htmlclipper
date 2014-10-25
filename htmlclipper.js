@@ -1,4 +1,63 @@
 /*
+
+Ideas:
+Make the popup CSS make it floating above wherever the user is.
+Package and send the content to somewhere else.
+Include the url that is captured, so that server side can fetch and inline images.
+
+[*] Get floating improved for iFrame
+[ ] Disable onClick while selecting (without the use of jQuery
+http://stackoverflow.com/questions/1755815/disable-all-click-events-on-page-javascript
+[ ] Submit to server
+
+Notes:
+Case studies:
+	slashdot.org:
+Keys overridden, so caused interference with q and r, so, had to prevent
+propagation.
+
+	gawker.com
+Fighting with other events on the page.
+Found that I could actually capture comments, if I right clicked on them.
+Also, had to prevent navigation away, to prevent navigation.
+Still wished that there was a way to halt all javascript events after a page
+had been rendered, though.
+
+So, gawker has tons of click events registered.
+But, but, on context isn't.
+So that still works.
+
+Oh wow!!! Apparently my "Make editable" bookmarklet did the trick the whole time.
+Otherwise though, I could just make a bookmarklet that iterates over the entire dom
+and clones each element.
+
+
+Apparently, it's not possible to remove all event listeners.
+I can however, clone elements, without their listeners.
+Should give that a try:
+http://stackoverflow.com/questions/19469881/javascript-remove-all-event-listeners-of-specific-type
+
+
+Issues:
+For some reason, maybe it's the CSS, some urls are being "pretty quoted".
+I have no idea why.
+It might be just textedit.
+
+Also, Firefox seems to get really messed up from it.
+
+
+---
+Disabling the use of onclick, temporarly:
+document.addEventListener("click",handler,true);
+
+function handler(e){
+    e.stopPropagation();
+    e.preventDefault();
+}
+
+
+---
+
 HtmlClipper v0.1
 
 Made by Florentin Sardan
@@ -30,6 +89,7 @@ Array.prototype.contains = function(obj) {
     return false;
 };
 
+var clipped;
 
 var flo = new function() {
   var d = document;
@@ -244,14 +304,15 @@ var flo = new function() {
   function getPopup() {
     var popup = d.createElement("div");
     popup.setAttribute('id', 'flo-popup');
-    popup.style.cssText='position: absolute;top: 10%;left: 10%;width: 80%;height: 80%;padding: 16px;border: 16px solid orange;background-color: white;z-index:10000000000;overflow: auto;';
+    //popup.style.cssText='position: absolute;top: 10%;left: 10%;width: 80%;height: 80%;padding: 16px;border: 16px solid orange;background-color: white;z-index:10000000000;overflow: auto;';
+	popup.style.cssText='position: fixed;top: 10%;left: 10%;width: 75%;height: 70%;padding: 16px; border: 16px solid orange;background-color: white;z-index:10000000000;overflow: auto;';
     return popup;
   };
   
   function getTextarea() {
     var ta = d.createElement("textarea");
     ta.setAttribute('id', 'flo-textarea');
-    ta.style.cssText='width:99%;height:200px';
+    ta.style.cssText='width:99%;height: 25%;/*height:200px*/';
     return ta;
   };
   
@@ -519,6 +580,8 @@ var flo = new function() {
     }
     textarea.value = tpl.format(cssText, idoc.body.innerHTML); 
     popup.appendChild(textarea);
+    
+    clipped = textarea.value;
   };
   
   function clean_active() {
@@ -547,12 +610,21 @@ var flo = new function() {
   };
   
   function clickEvent(event) {
+    event.stopPropagation();
     event.preventDefault();
     var node = event.target;
     // ignore click on my own elements
     if (!node.getAttribute('id') || !node.getAttribute('id').startsWith('flo-')) {
       change_active(node);
     }
+  }
+  
+  function submit_clipping() {
+  	xhr = new XMLHttpRequest();
+	xhr.open("POST", "http://www.dequeued.cc/htmlclipper/getclip.php", true);
+	xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+	xhr.send(clipped);
+	xhr.send("Hello");
   }
   
   function so_exit() {
@@ -574,26 +646,45 @@ var flo = new function() {
       alert("HtmlClipper only works on Firefox or Chrome.");
       return false;
     }
+    
+    // Prevent page from navigating away, if somehow it gets the inclination to,
+    // while we're clipping
+  window.onbeforeunload = confirmExit;
+  function confirmExit()
+  {
+    return "You're still clipping, are you sure you want to navigate away from this page?";
+  }
+    
+    
+    
+    
     d.addEventListener('keydown', so_captureKeyDownEvent, false);
     d.addEventListener('click', clickEvent, false);
+    //d.addEventListener('onClick', clickEvent, false);
+    //d.addEventListener('click', handler, false);
+    
     /*
     d.addEventListener('mouseover', downEvent, false)
     */
     
-    alert("HtmlClipper is On !\n\n" +
+    alert("WebClipper is On !\n\n" +
     		 "Click anywhere to select an element.\n"+
     		 "type W to select the parent element\n"+
     		 "type Q to undo selection of parent element\n"+
     		 "type R to remove the selected element\n"+
     		 "type S to clip the selected element\n"+
     		 "type ESC to remove the clip window\n"+
-    		 "type X to exit HtmlClipper\n"
+    		 "type X to exit HtmlClipper\n"+
+    		 "type Z to submit clipping\n"
     )
   };
   
   function so_captureKeyDownEvent(e) {
     var keyCode = d.all?window.event.keyCode:e.keyCode;
-
+	
+	// SO that sites like slashdot will work right
+	e.stopPropagation();
+	
     switch(keyCode) {
       case 27: // esc
         so_cleanUp();
@@ -614,6 +705,10 @@ var flo = new function() {
       case 88: // x
         so_exit();
         break;
+      case 90: // Z
+      	alert('hi');
+      	submit_clipping();
+      	break;
     }
   };  
 
